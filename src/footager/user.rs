@@ -1,7 +1,6 @@
-use axum::response::Html;
+use axum::http::StatusCode;
 use axum::{extract::Query, response::IntoResponse};
 //use tokio::postgres::Client;
-use axum::{extract::Extension};
 use eyre::Result;
 use serde::{Deserialize, Serialize};
 
@@ -28,8 +27,7 @@ impl FootageUser {
 }
 
 pub async fn footage_user_handler(Query(params): Query<FootageUserRequest>) -> impl IntoResponse {
-    println!("Handler info -");
     let name = params.name.as_deref().unwrap_or("Default value");
-    Html(format!("Hello {name}"))
+    (StatusCode::OK, "Request was reciewed")
 }
 
