@@ -1,13 +1,15 @@
 use axum::http::StatusCode;
-use axum::{extract::Query, response::IntoResponse};
+use axum::{extract::Json, response::IntoResponse};
 //use tokio::postgres::Client;
 use eyre::Result;
 use serde::{Deserialize, Serialize};
 
+use crate::middleware::bg_thread::BgController;
+
 #[derive(Debug, Deserialize)]
 pub struct FootageUserRequest {
-    name: Option<String>,
-    //req_url: String,
+    name: String,
+    req_url: String,
 }
 
 #[derive(Serialize)]
@@ -26,8 +28,26 @@ impl FootageUser {
     }
 }
 
-pub async fn footage_user_handler(Query(params): Query<FootageUserRequest>) -> impl IntoResponse {
-    let name = params.name.as_deref().unwrap_or("Default value");
+
+// fix get to post, because i told mate that i will wait for post req...
+pub async fn footage_user_handler(Json(params): Json<FootageUserRequest>) -> impl IntoResponse {
+    let name = params.name;
+    let url = &params.req_url;
+    // check inputs parameters
+    println!("name {} url {}" , name, url.clone());
+    
+    // create a new thread if not exists
+    if let Some(instance) = BgController::get_instance(){
+        // add items into the queue
+        if instance.has_no_job() {
+            // check queue and fill it 
+            // or fill it with a new req directly
+        }
+    }else {
+        // create a new thread with job
+    }
+
+
     (StatusCode::OK, "Request was reciewed")
 }
 

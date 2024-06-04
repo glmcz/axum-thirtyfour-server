@@ -1,10 +1,11 @@
 #![allow(unused)]
 
+use axum::Error as AxumError;
+use eyre::Ok;
 use eyre::Result;
 use reqwest::Client;
 use reqwest::header;
 use reqwest::header::CONTENT_TYPE;
-
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -12,48 +13,48 @@ use serde_json::json;
 // cargo test -- --nocapture
 // ********************************
 #[tokio::test]
-async fn default_get() -> Result<()> {
-    let resp = Client::new()
-        .get("http://localhost:3000/")
-        .header(CONTENT_TYPE, "application/json")
-        .json("get request")
-        .send()
-        .await
-        .expect("not failture from get");
-     
-
-    // Pretty print the result (status, headers, response cookies, client cookies, body)
-    println!("Post response status {:?} and text {:?}", resp.status(), resp.text().await?);
-    Ok(())
-}
-
-#[tokio::test]
-async fn default_post() -> Result<()> {
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct PostExample {
-        name: String,
-        passwd: String,
+async fn footager_post() -> Result<()> {  // TODO FIX Error result...
+    let post_footager = FootageUser {
+        name: "user".into(),
+        req_url: "https://domain.com".into(),
     };
+    let footager_url = "http://localhost:3000/";
+    _ = post(post_footager, footager_url).await;
 
-    let post_example = PostExample {
+        let post_admin = Admin {
         name: String::from("admin"),
         passwd: String::from("787458"),
     };
+    let admin_url = "http://localhost:3000/admin";
+    _ = post(post_admin, &admin_url).await;
 
+    Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Admin {
+    name: String,
+    passwd: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct FootageUser {
+    name: String,
+    req_url: String,
+}
+
+async fn post<T: Serialize>(post: T, url: &str) -> Result<()> {  
+    let json_payload = serde_json::to_string(&post).unwrap_or_else(|_| panic!("Failed to serialize"));
+    println!("Sending JSON payload: {}", json_payload); 
     let resp = Client::new()
-        .post("http://localhost:3000/admin")
+        .post(url)
         .header(CONTENT_TYPE, "application/json")
-        .json(&post_example)
+        .json(&post)
         .send()
         .await?;
 
-    let status = resp.status();
-    // Handle the response body more gracefully
-    if status.is_success() {
-        println!("Post response is {:?}", resp.json::<PostExample>().await?);
-    } else {
-        eprintln!("Failed to post: {}", resp.status());
-    }
+    println!("Response status {}", resp.status());
+    let text_response = &resp.text().await.unwrap_or_else(|_| panic!("Failed to read response body"));
+    println!("Raw response body: {}", text_response);
     Ok(())
 }

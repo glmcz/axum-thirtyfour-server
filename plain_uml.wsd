@@ -1,0 +1,15 @@
+@startuml
+participant client
+
+client -> main_thread : new req arrived
+main_thread -> footage_handler : we want to proceed it
+main_thread -> main_thread : add req to Queue if script already running
+
+footage_handler -> bg_thread : check if bg_thread exists
+footage_handler -> footage_handler : if not create a new thread
+bg_thread -> scripts : if script not running already
+bg_thread -> bg_thread : wait for completed download
+bg_thread -> main_thread : script is done so while waiting check req queue and invoke script
+bg_thread -> main_thread : give a link for downloaded file to client
+main_thread -> client : send response
+@enduml
