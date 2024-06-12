@@ -1,15 +1,18 @@
 use crate::middleware::job::Task;
 use tokio::sync::mpsc;
-use tokio::task;
+use eyre::{Ok, Result};
 // bg thread controller
 use lazy_static::lazy_static;
-use std::ops::DerefMut;
 use std::sync::Mutex;
+
+use super::cpu::{CPU, init_cpu_measurement};
+
 
 // singletone instance, which we use accross program.
 // during runtime it fill be filled with current task, that needs to be proceeds.
 lazy_static! {
     static ref BG_CONTROLLER: Mutex<Option<BgController>> = Mutex::new(None);
+    static ref METRICS: Mutex<CPU> = Mutex::new(init_cpu_measurement()); 
 }
 pub struct BgController {
     curr_job: Option<Task>, // we should have only one task at one time. We can put it into queue etc...
@@ -34,17 +37,33 @@ impl BgController {
         guard.take()
     }
 
-
-    pub fn has_no_job(self) -> bool {
+    // if curr_job is some add job into queue
+    // in next phrase check demnanding of CPU and mem
+    // and according to it allow more async current jobs 
+    pub fn has_no_job(&self) -> bool {
         if self.curr_job.is_some() {
             return true;
         }
         return false;
     }
+    // take all jobs from footager users
+    pub fn add_job(&mut self, job: Task) -> Result<(), eyre::Report> {
+        // add items into the queue
+        let mut guard = METRICS.lock().unwrap();
+        guard.get_cpu_usage();
+        guard.get_memory_usage();
+        // hm currently we are proceeding only one task at time.
+        if self.has_no_job() {
+            // check queue and fill it 
+            // or fill it with a new req directly
+            self.curr_job = Some(job);
+        }
+        Ok(())
+    }
 }
 // handle runnig of artgrid script and parsing url
 pub fn parse_url(url: String) {
     // TODO match url
-
-    //
+    log::info!("We are choosing right script for user url \n{}", url);
+    
 }

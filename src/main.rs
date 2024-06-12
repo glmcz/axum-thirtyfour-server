@@ -1,23 +1,46 @@
+use axum::error_handling::{HandleError, HandleErrorLayer};
+use reqwest::StatusCode;
 use tokio::signal;
+use std::sync::{Arc, RwLock};
+use log::LevelFilter;
 use axum::{
-  routing::{get, post}, Router
+  routing::post, Router
 };
+use tower::{BoxError, ServiceBuilder};
 
 mod footager;
 mod admin;
 mod middleware;
+
+use middleware::queue::Queue;
+use admin::logger::SimpleLogger;
 // TODO upgrade to https://github.com/hyperium/tonic
 
+struct SharedState {
+    queue: Queue,
+}
+
+type SharedAppState = Arc<SharedState>;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    _ = log::set_boxed_logger(Box::new(SimpleLogger))
+    .map(|()| log::set_max_level(LevelFilter::max()));
+    
+    let shared_state = SharedAppState::new(SharedState { queue: Queue::new() });
     // build our application with a single route
-    let app = Router::new().route("/", post(footager::user::footage_user_handler));
-    let admin_app = Router::new().route("/admin", post(admin::admin::admin_handler));
-
+    let app = Router::new().route("/", post(footager::user::footage_user_handler))
+    // .layer(
+    //     let a = ServiceBuilder::new();
+    //     a.layer_fn(handle_error);
+    //     a
+    // )
+    .route("/admin", post(admin::admin::admin_handler))
+    .with_state(shared_state);
+    
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("localhost:3000").await.unwrap();
-    axum::serve(listener, app.merge(admin_app))
+    axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
@@ -45,4 +68,9 @@ async fn shutdown_signal() {
         _ = ctrl_c => {},
         _ = terminate => {},
     }
+}
+
+
+async fn handle_error(err: BoxError) -> (StatusCode, String) {
+    (StatusCode::UNPROCESSABLE_ENTITY, err.to_string())
 }

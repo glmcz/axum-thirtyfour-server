@@ -4,7 +4,7 @@
 use crate::middleware::job::Task;
 use core::ops::Deref;
 use core::ops::DerefMut;
-struct Queue {
+pub struct Queue {
     inner : Vec<Task>,
     //capacity: u8,
 }

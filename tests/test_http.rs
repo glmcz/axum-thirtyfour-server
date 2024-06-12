@@ -18,6 +18,7 @@ async fn footager_post() -> Result<()> {  // TODO FIX Error result...
         name: "user".into(),
         req_url: "https://domain.com".into(),
     };
+    
     let footager_url = "http://localhost:3000/";
     _ = post(post_footager, footager_url).await;
 
@@ -42,6 +43,8 @@ struct FootageUser {
     name: String,
     req_url: String,
 }
+
+
 
 async fn post<T: Serialize>(post: T, url: &str) -> Result<()> {  
     let json_payload = serde_json::to_string(&post).unwrap_or_else(|_| panic!("Failed to serialize"));
