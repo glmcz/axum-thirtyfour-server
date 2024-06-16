@@ -1,0 +1,11 @@
+###
+# curl -X POST http://localhost:3000/admin -H "Content-Type: application/json" -H "Authorization: Bearer your_token" -d '{ "name": "ddd", "passwd":"http://"}'
+
+POST http://localhost:3000/admin
+Authorization: Bearer your_token
+Content-Type: application/json
+
+{ "name": "ddd", "passwd":"http://"}
+
+###
+

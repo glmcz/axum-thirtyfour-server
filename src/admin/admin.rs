@@ -1,17 +1,33 @@
-
-use axum::{
-    body::Body,
-    extract::Json, http::{header::CONTENT_TYPE, StatusCode}, 
-    response::{IntoResponse, Response}, 
-};
+use std::ops::Deref;
+use axum::{body::Body, extract::Json, http::{header::CONTENT_TYPE, StatusCode}, response::{IntoResponse, Response}, extract::{Request, Extension}, RequestExt};
+use axum::middleware::Next;
+use axum::routing::head;
+use tower::{Layer, ServiceExt};
 use serde::{Deserialize, Serialize};
 
-
-#[derive(Deserialize, Serialize)]
+use std::task::{Context, Poll};
+use tower::Service;
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Admin {
+    //inner: S,
     name: String,
     passwd: String,
 }
+
+// impl <S, Request> Service<Request> for Admin<S>
+//     where S:Service<Request>
+// {
+//  type Response = S::Response;
+//     type Error = S::Error;
+//     type Future = S::Future;
+//
+//     fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+//         self.inner.poll_ready(ctx)
+//     }
+//     fn call(&mut self, req: Request) -> Self::Future {
+//         self.inner.call(req)
+//     }
+// }
 
 #[derive(Serialize)]
 pub struct AdminResponse {
@@ -19,16 +35,42 @@ pub struct AdminResponse {
 }
 
 
-pub async fn admin_handler(Json(mut admin): Json<Admin>) -> Json<Admin> {
-  
-    // let response = AdminResponse {
-    //     message: "Admin data received successfully".into(),
-    // };
+pub async fn admin_handler(admin: Request) -> (StatusCode,Json<Admin>) {
+    let admin: Json<Admin>  = admin.extract().await.unwrap();
+   (StatusCode::OK, admin)
+}
 
-    admin.name = "different".into();
-    //let serialized_resp = json!(response);
-    //let body = serde_json::to_string(&response).unwrap();
+// pub fn admin_authentication() -> impl Layer<axum::Router> {
+//
+// }
 
-    Json(admin)
-   // (StatusCode::OK, Json(admin))
+pub async fn admin_auth(mut req: Request, next: Next) -> Result<Response, StatusCode> /*http::Response<Body>*/ {
+    let auth_header = req.headers()
+        .get(http::header::AUTHORIZATION)
+        .and_then(|header| header.to_str().ok());
+
+    let auth_header = if let Some(auth) = auth_header {
+        auth
+    } else {
+        return Err(StatusCode::UNAUTHORIZED)
+    };
+
+    // if let Some(current_user) = authorize_current_user(auth_header).await {
+        // insert the current user into a request extension so the handler can
+        // extract it
+        // req.extensions_mut().insert(current_user);
+
+    Ok(next.run(req).await)
+    // } else {
+    //     Err(StatusCode::UNAUTHORIZED)
+    // }
+}
+
+// Error handler layer
+pub async fn error_handle(req: http::Request<Body>, next: Next) -> http::Response<Body> {
+    let response = next.run(req).await;
+
+    // Perform logic after calling the next service (optional)
+
+    response
 }

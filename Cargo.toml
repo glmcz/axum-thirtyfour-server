@@ -16,4 +16,7 @@ reqwest = { version = "0.12.4"}
 lazy_static = "1.4.0"
 sysinfo = "0.30.12"
 log = { version = "0.4.21", features = ["std"] }
-tower = "0.4.13"
+tower = { version = "0.4.13", features = ["limit"] }
+http = "1.1.0"
+tokio-util = "0.7.11"
+pin-project = "1.1.5"
