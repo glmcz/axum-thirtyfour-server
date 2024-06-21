@@ -13,14 +13,13 @@ use pin_project::pin_project;
 #[pin_project]
 pub struct ResponseFuture<T> {
     #[pin]
-    inner: T,
+    response_future: T,
     #[pin]
-    _permit: Option<OwnedSemaphorePermit>,
+    permit: OwnedSemaphorePermit,
 }
-
 impl<T> ResponseFuture<T>{
-    fn new(inner: T, _permit: Option<OwnedSemaphorePermit>) -> ResponseFuture<T> {
-        ResponseFuture{ inner, _permit }
+    fn new(response_future: T, permit: OwnedSemaphorePermit) -> ResponseFuture<T> {
+        ResponseFuture{ response_future, permit }
     }
 }
 
@@ -30,7 +29,26 @@ where
 {
     type Output = Result<T, E>;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Poll::Ready(ready!(self.project().inner.poll(cx)))
+        // It checks for completion of the actual service call.
+        // ****************************************************
+        let this = self.project();
+        match this.response_future.poll(cx) {
+            Poll::Ready(result) => {
+                let result = result.map_err(Into::into);
+                return Poll::Ready(result);
+            }
+            Poll::Pending => {}
+        }
+
+        // match this.permit.(cx){
+        //     Poll::Ready(result) => {
+        //         let result = result.map_err(Into::into);
+        //         return Poll::Ready(result);
+        //     }
+        //     Poll::Pending => {}
+        // }
+
+        Poll::Pending
     }
 }
 
@@ -118,6 +136,6 @@ impl<S, Request> Service<Request> for Limiter<S>
             .take()
             .expect("max req is reached. poll_ready must be called first");
         println!("middleware hello world");
-        ResponseFuture::new(future, Some(permit))
+        ResponseFuture::new(future, permit)
     }
 }
