@@ -20,3 +20,4 @@ tower = { version = "0.4.13", features = ["limit"] }
 http = "1.1.0"
 tokio-util = "0.7.11"
 pin-project = "1.1.5"
+rand = "0.9.0-alpha.1"

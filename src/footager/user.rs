@@ -1,3 +1,4 @@
+use std::time::Duration;
 use axum::http::StatusCode;
 use axum::{extract::Json, response::IntoResponse};
 
@@ -38,7 +39,7 @@ pub async fn footage_user_handler(Json(params): Json<FootageUserRequest>) -> imp
     let url = &params.req_url;
     // check inputs parameters
     println!("name {} url {}" , name, url.clone());
-   
+    tokio::time::sleep(Duration::from_secs(10)).await; // imitation of some long-running task
     
     // create a new thread if not exists
     if let Some(mut instance) = BgController::get_instance(){

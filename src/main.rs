@@ -1,12 +1,8 @@
-use axum::error_handling::{HandleError, HandleErrorLayer};
-use reqwest::StatusCode;
 use tokio::signal;
-use std::sync::{Arc, RwLock};
 use log::LevelFilter;
 use axum::{
   routing::post, Router
 };
-use tower::{BoxError, ServiceBuilder};  // Never use ServiceBuilder if you don`t want to see Trait bounds hell
 
 mod footager;
 mod admin;
@@ -16,9 +12,9 @@ use admin::logger::SimpleLogger;
 // TODO upgrade to https://github.com/hyperium/tonic
 use footager::limiter::MyLayer;
 
-
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    let zk:usize = 1;
     _ = log::set_boxed_logger(Box::new(SimpleLogger))
     .map(|()| log::set_max_level(LevelFilter::max()));
 
@@ -28,8 +24,10 @@ async fn main() {
 
     .route("/", post(
         footager::user::footage_user_handler))
-        .layer(footager::limiter::MyLayer::new()); // there will be Queue for req in case of high load
-
+        //.layer(GlobalConcurrencyLimitLayer::new(3))  //Just for legacy, that this official layer don`t work without with_state(())
+        //.with_state(());
+        .layer(footager::limiter::MyLayer::new(2))
+        .with_state(()); // there will be Queue for req in case of high load
     let listener = tokio::net::TcpListener::bind("localhost:3000").await.unwrap();
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())

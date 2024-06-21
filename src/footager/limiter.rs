@@ -1,40 +1,123 @@
-use std::task::{Context, Poll};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll, ready};
+use std::time::Duration;
 use axum::extract::Request;
-use tower::{Layer, Service};
+use tokio_util::sync::PollSemaphore;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, SemaphorePermit};
+
+use tower::{Layer, Service, ServiceExt};
+use pin_project::pin_project;
+
+#[pin_project]
+pub struct ResponseFuture<T> {
+    #[pin]
+    inner: T,
+    #[pin]
+    _permit: Option<OwnedSemaphorePermit>,
+}
+
+impl<T> ResponseFuture<T>{
+    fn new(inner: T, _permit: Option<OwnedSemaphorePermit>) -> ResponseFuture<T> {
+        ResponseFuture{ inner, _permit }
+    }
+}
+
+impl<F, T, E> Future for ResponseFuture<F>
+where
+    F: Future<Output = Result<T, E>>
+{
+    type Output = Result<T, E>;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Poll::Ready(ready!(self.project().inner.poll(cx)))
+    }
+}
+
 
 #[derive(Clone)]
-pub struct MyLayer;
-
+pub struct MyLayer{
+    limit: usize,
+}
 impl MyLayer {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(limit: usize) -> Self {
+        Self { limit }
     }
-}impl<S> Layer<S> for MyLayer {
+}
+impl<S> Layer<S> for MyLayer {
     type Service = Limiter<S>;
     fn layer(&self, inner: S) -> Self::Service {
-        println!("Middleware hello world");
-        Limiter { inner }
+        Limiter::new(inner, self.limit)
     }
 }
-#[derive(Clone)]
+
 pub struct Limiter<S> {
     inner: S,
+    semaphore: PollSemaphore,
+    permit: Option<OwnedSemaphorePermit>,
 }
-impl<S, B> Service<Request<B>> for Limiter<S>
+impl<S> Limiter<S> {
+    pub fn new(inner: S, limit: usize) -> Self {
+        Limiter{
+            inner,
+            semaphore: PollSemaphore::new(Arc::new(Semaphore::new(limit))),
+            permit: None,
+        }
+    }
+}
+
+impl<S: Clone> Clone for Limiter<S> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            semaphore: self.semaphore.clone(),
+            permit: None,
+        }
+    }
+}
+impl<S, Request> Service<Request> for Limiter<S>
     where
-        S: Service<Request<B>> + Clone + Send
+        S: Service<Request>
 {
     type Response = S::Response;
 
     type Error = S::Error;
-    type Future = S::Future;
+    type Future = ResponseFuture<S::Future>;
+
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Our timeout service is ready if the inner service is ready.
-        self.inner.poll_ready(cx).map_err(Into::into)
+        // poll make sure, that only defined num of permits go into
+        // our service handler fn. If handler is busy permits are freed
+        // only after handler finish his jobs.
+
+        // we can also use
+        let num = self.semaphore.available_permits();
+        println!("available {}", num);
+        match self.semaphore.poll_acquire(cx) {
+            Poll::Ready(Some(permit)) => {
+                println!("Acquired a permit");
+                self.permit = Some(permit);
+                Poll::Ready(Ok(()))
+            }
+            Poll::Ready(None) => {
+                Poll::Pending
+            }
+            Poll::Pending => {
+                // it goes there only once for each req
+                Poll::Pending // waking up is a job of executor (Tokio)
+                // actualy if poll is pending we can do something different.
+                // for example check CPU, load balancing, etc...
+            }
+        }
     }
 
-    fn call(&mut self, req: Request<B>) -> Self::Future {
+    fn call(&mut self, req: Request) -> Self::Future {
+        let future = self.inner.call(req);
         println!("middleware hello world");
-        self.inner.call(req)
+        let permit = self
+            .permit
+            .take()
+            .expect("max req is reached. poll_ready must be called first");
+        println!("middleware hello world");
+        ResponseFuture::new(future, Some(permit))
     }
 }

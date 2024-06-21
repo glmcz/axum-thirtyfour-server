@@ -6,7 +6,10 @@ use tower::{Layer, ServiceExt};
 use serde::{Deserialize, Serialize};
 
 use std::task::{Context, Poll};
+use std::time::Duration;
 use tower::Service;
+use rand::random;
+
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Admin {
     //inner: S,
@@ -37,7 +40,9 @@ pub struct AdminResponse {
 
 pub async fn admin_handler(admin: Request) -> (StatusCode,Json<Admin>) {
     let admin: Json<Admin>  = admin.extract().await.unwrap();
-   (StatusCode::OK, admin)
+    println!("req random{} and passwd {}", random::<i32>(), admin.passwd);
+    tokio::time::sleep(Duration::from_secs(10)).await; // imitation of some long-running task
+    (StatusCode::OK, admin)
 }
 
 // pub fn admin_authentication() -> impl Layer<axum::Router> {
