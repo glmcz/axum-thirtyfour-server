@@ -1,14 +1,14 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll, ready};
-use std::time::Duration;
-use axum::extract::Request;
+use std::task::{Context, Poll};
+
 use tokio_util::sync::PollSemaphore;
-use tokio::sync::{OwnedSemaphorePermit, Semaphore, SemaphorePermit};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use tower::{Layer, Service, ServiceExt};
 use pin_project::pin_project;
+// use crate::middleware::job::Task;
 
 #[pin_project]
 pub struct ResponseFuture<T> {
@@ -106,6 +106,24 @@ impl<S, Request> Service<Request> for Limiter<S>
         // poll make sure, that only defined num of permits go into
         // our service handler fn. If handler is busy permits are freed
         // only after handler finish his jobs.
+
+        // TODO incorporate waiting queue without bg controller we dont need it right?
+        // create a new thread if not exists
+        // if let Some(mut instance) = BgController::get_instance(){
+        //
+        //     if instance.has_no_job() {
+        //         let job = Task::new("task".into(), url.clone(), "".into(), false);
+        //         _ = instance.add_job(job);
+        //     }
+        //
+        // }else {
+        //     // fist time use of bg thread...
+        //     let mut bg = BgController::init();
+        //     let job = Task::new("task".into(), url.clone(), "".into(), false);
+        //     _ = bg.add_job(job);
+        //     // create a new thread with job
+        // }
+
 
         // we can also use
         let num = self.semaphore.available_permits();

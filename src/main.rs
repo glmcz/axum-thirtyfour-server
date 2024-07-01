@@ -1,20 +1,30 @@
+use std::sync::Arc;
 use tokio::signal;
 use log::LevelFilter;
 use axum::{
   routing::post, Router
 };
+use thirtyfour::error::WebDriverError;
 
 mod footager;
 mod admin;
 mod middleware;
+mod file_utils;
+ mod webdriver;
+
 
 use admin::logger::SimpleLogger;
 // TODO upgrade to https://github.com/hyperium/tonic
-use footager::limiter::MyLayer;
+use crate::webdriver::Selenium;
+
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
-    let zk:usize = 1;
+async fn main() -> Result<(), WebDriverError> {
+
+    // TODO make sure driver is arc, because it will be cloned for each incoming req.
+    let driver = Selenium::init_selenium_driver("src/config.json").await?;
+
+
     _ = log::set_boxed_logger(Box::new(SimpleLogger))
     .map(|()| log::set_max_level(LevelFilter::max()));
 
@@ -26,13 +36,15 @@ async fn main() {
         footager::user::footage_user_handler))
         //.layer(GlobalConcurrencyLimitLayer::new(3))  //Just for legacy, that this official layer don`t work without with_state(())
         //.with_state(());
-        .layer(footager::limiter::MyLayer::new(2))
-        .with_state(()); // there will be Queue for req in case of high load
+        .layer(middleware::limiter::MyLayer::new(2))
+        .with_state(Arc::new(driver.current_driver)); // there will be Queue for req in case of high load
     let listener = tokio::net::TcpListener::bind("localhost:3000").await.unwrap();
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
+
+    Ok(())
 }
 
 async fn shutdown_signal() {

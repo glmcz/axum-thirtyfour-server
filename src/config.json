@@ -1,0 +1,5 @@
+{
+  "geckodriver_path": "/Users/martindurak/Desktop/web_rust/selenium/drivers/geckodriver_mac",
+  "driver_address": "http://localhost",
+  "port": 4444
+}
