@@ -4,7 +4,6 @@ use log::LevelFilter;
 use axum::{
   routing::post, Router
 };
-use thirtyfour::error::WebDriverError;
 
 mod footager;
 mod admin;
@@ -19,7 +18,7 @@ use crate::webdriver::Selenium;
 
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), WebDriverError> {
+async fn main() -> Result<(), fantoccini::error::WebDriver> {
 
     // TODO make sure driver is arc, because it will be cloned for each incoming req.
     let driver = Selenium::init_selenium_driver("src/config.json").await?;
@@ -32,7 +31,7 @@ async fn main() -> Result<(), WebDriverError> {
     .route("/admin", post(admin::admin::admin_handler))
         .layer(axum::middleware::from_fn(admin::admin::admin_auth))
 
-    .route("/", post(
+    .route("/footager", post(
         footager::user::footage_user_handler))
         //.layer(GlobalConcurrencyLimitLayer::new(3))  //Just for legacy, that this official layer don`t work without with_state(())
         //.with_state(());

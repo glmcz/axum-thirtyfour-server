@@ -6,6 +6,8 @@ use lazy_static::lazy_static;
 use std::sync::Mutex;
 
 use super::cpu::{CPU, init_cpu_measurement};
+//use crate::footager::artgrid;
+use crate::Selenium;
 
 
 // singletone instance, which we use accross program.
@@ -38,7 +40,7 @@ impl BgController {
     }
 
     // if curr_job is some add job into queue
-    // in next phrase check demnanding of CPU and mem
+    // in next phrase check demanding of CPU and mem
     // and according to it allow more async current jobs 
     pub fn has_no_job(&self) -> bool {
         if self.curr_job.is_some() {
@@ -58,6 +60,8 @@ impl BgController {
             // or fill it with a new req directly
             self.curr_job = Some(job);
         }
+        // better desing of app we need
+
         Ok(())
     }
 }

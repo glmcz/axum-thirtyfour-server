@@ -8,4 +8,8 @@ Content-Type: application/json
 { "name": "ddd", "passwd":"http://"}
 
 ###
+POST http://localhost:3000/footager
+Authorization: Bearer your_token
+Content-Type: application/json
 
+{ "name": "test", "url": "https://artgrid.io/clip/6243583/snow-winter-chugach-alaska" }
