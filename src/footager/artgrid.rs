@@ -1,28 +1,20 @@
-use std::any::Any;
-use std::mem::zeroed;
 use std::sync::Arc;
 use file_helpers::file_downloaded;
-
+use fantoccini::{Client, Locator};
+use fantoccini::actions::{InputSource, MouseActions, PointerAction,};
+use fantoccini::error::CmdError;
 use tokio::time::Duration;
 use crate::file_utils::file_helpers;
 
 static ARTGRID_TEST_USER_INPUT: &str = "https://artgrid.io/clip/302105/boat-river-buildings-clouds";
 static ARTGRID_SUBMIT_XPATH: &str = "//mat-dialog-container[@id=\'LoginDialog\']/art-login/div/div/div[2]/div/form/div[2]/art-spinner-button/div/button";
 ///html/body/div[5]/div[2]/div/mat-dialog-container                     /art-login/div/div/div[2]/div/form/div[2]/art-spinner-button/div/button
-static ARTGRID_EMAIL: &str = "mates.glm@gmail.com";
-static ARTGRID_PASSWORD: &str = "PosledniNadeje1";
 static ARTGRID_COLLECTION: &str = "//button[@class='art-user']";
 static ARTGRID_SING_IN: &str = "https://artgrid.io/signin";
 static ARTGRID_HOME_PAGE: &str = "https://artgrid.io";
 static ARTGRID_CHECKOUT: &str = "/html/body/div[5]/div[2]/div/mat-dialog-container/art-my-cart/div/div/div[2]/button";
 
-
-use fantoccini::{Client, Locator};
-use fantoccini::actions::{InputSource, MOUSE_BUTTON_MIDDLE, MouseActions, PointerAction, WheelAction};
-use fantoccini::error::{CmdError, ErrorStatus};
-use serde_json::{Error, Value};
-
-fn get_href_value(user_url: &String) -> String {
+fn get_href_value(user_url: &str) -> String {
     if let Some(index) = user_url.find("/") {
         let href = format!(
             "{}{}{}",
@@ -38,7 +30,7 @@ fn get_href_value(user_url: &String) -> String {
     // Error: NoSuchElement("XPath(//a[@href='https://artgrid.io/clip/302105/boat-river-buildings-clouds'])")
 }
 
-fn get_footage_id(user_url: &String) -> String {
+fn get_footage_id(user_url: &str) -> String {
     if let Some(index) = user_url.find("clip/") {
         let href = format!("{}", &user_url[index + 5..]);
         println!("{}", index.to_string());
@@ -54,7 +46,9 @@ fn get_footage_id(user_url: &String) -> String {
 }
 
 // TODO proper error
-pub async fn run_artgrid_instance(driver: Arc<Client>, user_url: String) -> Result<String, fantoccini::error::CmdError> {
+// TODO allow download whole channel of author
+pub async fn run_artgrid_instance(driver: Arc<Client>, user_url: &str) -> Result<String, fantoccini::error::CmdError> {
+
 
     driver.goto(ARTGRID_HOME_PAGE).await?;
     driver.maximize_window().await?;
@@ -65,13 +59,14 @@ pub async fn run_artgrid_instance(driver: Arc<Client>, user_url: String) -> Resu
         driver.goto(ARTGRID_SING_IN).await?;
         tokio::time::sleep(Duration::from_secs(3)).await;
 
-        let email = driver.find(Locator::Id("mat-input-4")).await?;
-        let pass = driver.find(Locator::Id("mat-input-5")).await?;
+        let email_btn = driver.find(Locator::Id("mat-input-4")).await?;
+        let passwd_btn = driver.find(Locator::Id("mat-input-5")).await?;
 
-        // TODO allow download whole channel of author
+        let login = std::env::var("ARTGRID_EMAIL").expect("Can`t load .env variable for login");
+        let passwd = std::env::var("ARTGRID_PASSWD").expect("Can`t load .env variable for password");
 
-        email.send_keys(ARTGRID_EMAIL).await?;
-        pass.send_keys(ARTGRID_PASSWORD).await?;
+        email_btn.send_keys(login.as_str()).await?;
+        passwd_btn.send_keys(passwd.as_str()).await?;
         tokio::time::sleep(Duration::from_secs(2)).await;
 
         let submit = driver.find(Locator::XPath(ARTGRID_SUBMIT_XPATH)).await?;
@@ -87,10 +82,9 @@ pub async fn run_artgrid_instance(driver: Arc<Client>, user_url: String) -> Resu
     }
 
     //redirect to user footage
-    let res = driver.goto(&user_url).await;
+    driver.goto(&user_url).await?;
 
     tokio::time::sleep(Duration::from_secs(1)).await;
-    //add item to card
 
     // there is some block from Artgrid side and this is workaround...
     driver.find(Locator::Id("main-logo-mobile")).await?.click().await?;
@@ -104,9 +98,7 @@ pub async fn run_artgrid_instance(driver: Arc<Client>, user_url: String) -> Resu
     // pokud uz nechceme dal vybirat a davat do kosiku, tak hura do kosiku
     driver.goto("https://artgrid.io/my-cart").await?;
 
-    // checkout kosik
     tokio::time::sleep(Duration::from_secs(2)).await;
-    //TODO need to disable it because it block find method which we run after, so now workaround with sleep is used
 
     let proceed = driver.find(Locator::XPath(ARTGRID_CHECKOUT)).await?;
     let mouse_actions = MouseActions::new("mouse".to_owned())
@@ -179,7 +171,6 @@ pub async fn run_artgrid_instance(driver: Arc<Client>, user_url: String) -> Resu
             done(false); // Notify Selenium that the operation failed - anchor not found
         }
     "#;
-    //Result: ScriptRet { handle: SessionHandle { session_id: "da64ed23-66b1-4434-8541-368474193d2a" }, value: Bool(false) }
     let ret = match driver.execute(js_code, args).await{
         Ok(res) => Ok(res),
         Err(err) => { println!("JS error {:?}", err);Err(err)}
@@ -187,18 +178,16 @@ pub async fn run_artgrid_instance(driver: Arc<Client>, user_url: String) -> Resu
     println!("Result: {:?}", ret);
 
 
-    //TODO if file is in download folder twice (1), (2), we need to choose newest one and checking if
-    //TODO resume, error, the file`s size is growing or not. Size can`t be 0;
 
-    //in the end extract user footage id for file identification on file server side
+    // at the end extract user footage id for file identification on server side
     let id = get_footage_id(&user_url);
 
-    //file download check returning path of downloaded file
     match file_downloaded(id){
         Ok(downloaded_file) => Ok(downloaded_file),
         Err(err) => Err(CmdError::Lost(err.into())),
     }
 
-    // TODO every error throw down whole selenium script...
-    // is it realy what we wont to?
+    //TODO if file is in download folder twice (1), (2), we need to choose newest one and checking if
+    //TODO resume, error, the file`s size is growing or not. Size can`t be 0;
+    // TODO every error throw down whole selenium script... is it really what we wont to? Maybe handle result instead of "?"
 }

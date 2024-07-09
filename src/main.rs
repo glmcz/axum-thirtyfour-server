@@ -4,6 +4,7 @@ use log::LevelFilter;
 use axum::{
   routing::post, Router
 };
+use dotenv::dotenv;
 
 mod footager;
 mod admin;
@@ -17,8 +18,10 @@ use admin::logger::SimpleLogger;
 use crate::webdriver::Selenium;
 
 
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), fantoccini::error::WebDriver> {
+    dotenv().ok();
 
     // TODO make sure driver is arc, because it will be cloned for each incoming req.
     let driver = Selenium::init_selenium_driver("src/config.json").await?;
