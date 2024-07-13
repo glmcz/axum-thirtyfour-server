@@ -1,12 +1,7 @@
-use std::ops::Deref;
-use axum::{body::Body, extract::Json, http::{header::CONTENT_TYPE, StatusCode}, response::{IntoResponse, Response}, extract::{Request, Extension}, RequestExt};
+use axum::{extract::Json, http:: StatusCode, response::Response, extract::Request, RequestExt};
 use axum::middleware::Next;
-use axum::routing::head;
 use tower::{Layer, ServiceExt};
 use serde::{Deserialize, Serialize};
-
-use std::task::{Context, Poll};
-use std::time::Duration;
 use tower::Service;
 use rand::random;
 
@@ -16,38 +11,17 @@ pub struct Admin {
     name: String,
     passwd: String,
 }
-
-// impl <S, Request> Service<Request> for Admin<S>
-//     where S:Service<Request>
-// {
-//  type Response = S::Response;
-//     type Error = S::Error;
-//     type Future = S::Future;
-//
-//     fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-//         self.inner.poll_ready(ctx)
-//     }
-//     fn call(&mut self, req: Request) -> Self::Future {
-//         self.inner.call(req)
-//     }
-// }
-
 #[derive(Serialize)]
 pub struct AdminResponse {
     message: String,
 }
 
-
 pub async fn admin_handler(admin: Request) -> (StatusCode,Json<Admin>) {
     let admin: Json<Admin>  = admin.extract().await.unwrap();
     println!("req random{} and passwd {}", random::<i32>(), admin.passwd);
-    tokio::time::sleep(Duration::from_secs(10)).await; // imitation of some long-running task
+    //tokio::time::sleep(Duration::from_secs(10)).await; // imitation of some long-running task
     (StatusCode::OK, admin)
 }
-
-// pub fn admin_authentication() -> impl Layer<axum::Router> {
-//
-// }
 
 pub async fn admin_auth(mut req: Request, next: Next) -> Result<Response, StatusCode> /*http::Response<Body>*/ {
     let auth_header = req.headers()
@@ -69,13 +43,4 @@ pub async fn admin_auth(mut req: Request, next: Next) -> Result<Response, Status
     // } else {
     //     Err(StatusCode::UNAUTHORIZED)
     // }
-}
-
-// Error handler layer
-pub async fn error_handle(req: http::Request<Body>, next: Next) -> http::Response<Body> {
-    let response = next.run(req).await;
-
-    // Perform logic after calling the next service (optional)
-
-    response
 }

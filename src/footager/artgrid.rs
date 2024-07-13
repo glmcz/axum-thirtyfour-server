@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use file_helpers::file_downloaded;
 use fantoccini::{Client, Locator};
 use fantoccini::actions::{InputSource, MouseActions, PointerAction,};
@@ -47,7 +46,7 @@ fn get_footage_id(user_url: &str) -> String {
 
 // TODO proper error
 // TODO allow download whole channel of author
-pub async fn run_artgrid_instance(driver: Arc<Client>, user_url: &str) -> Result<String, fantoccini::error::CmdError> {
+pub async fn run_artgrid_instance(driver: Client, user_url: &str) -> Result<String, fantoccini::error::CmdError> {
 
 
     driver.goto(ARTGRID_HOME_PAGE).await?;
@@ -84,12 +83,13 @@ pub async fn run_artgrid_instance(driver: Arc<Client>, user_url: &str) -> Result
     //redirect to user footage
     driver.goto(&user_url).await?;
 
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     // there is some block from Artgrid side and this is workaround...
+    // driver.find(Locator::Css("mat-list-text")).await?.click().await?;
     driver.find(Locator::Id("main-logo-mobile")).await?.click().await?;
     driver.back().await?;
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     driver.find(Locator::Css(".art-main-btn-t1.lg")).await?.click().await?;
 
@@ -171,6 +171,8 @@ pub async fn run_artgrid_instance(driver: Arc<Client>, user_url: &str) -> Result
             done(false); // Notify Selenium that the operation failed - anchor not found
         }
     "#;
+    // sometimes it throws
+    // JS error Standard(WebDriver { error: JavascriptError, message: "javascript error: done is not a function\n
     let ret = match driver.execute(js_code, args).await{
         Ok(res) => Ok(res),
         Err(err) => { println!("JS error {:?}", err);Err(err)}

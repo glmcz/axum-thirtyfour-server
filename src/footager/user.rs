@@ -1,17 +1,22 @@
-use std::sync::Arc;
+use std::rc::Rc;
 use axum::http::StatusCode;
 use axum::{extract::Json, response::IntoResponse};
 use axum::extract::State;
-use fantoccini::Client;
-
-
 use serde::{Deserialize, Serialize};
-use crate::footager::artgrid::run_artgrid_instance;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot;
+use tokio::sync::mpsc::Receiver;
+
 
 #[derive(Debug, Deserialize)]
 pub struct FootageUserRequest {
     name: String,
     url: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct FootageUser {
+    recv: Rc<Receiver<String>>,
 }
 
 #[derive(Serialize)]
@@ -21,21 +26,43 @@ pub enum FootageUserResponse {
     BadRequest,
 }
 
-// fix get to post, because i told mate that i will wait for post req...
+#[derive(Debug)]
+pub enum Command {
+    Get {
+        key: String,
+        resp: Responder<String>,
+    },
+    // Set {
+    //     id: u8,
+    //     val: String,
+    //     resp: Responder<String>,
+    // },
+}
+
+type Responder<T> = oneshot::Sender<T>;
+
 #[axum::debug_handler]
-pub async fn footage_user_handler(State(state): State<Arc<Client>>, Json(params): Json<FootageUserRequest>) -> impl IntoResponse {
+pub async fn footage_user_handler(State(state): State<Sender<Command>>, Json(params): Json<FootageUserRequest>) -> impl IntoResponse {
     let name = params.name;
     let url = &params.url;
-    // check inputs parameters
     println!("name {} url {}" , name, url.clone());
 
-    //tokio::time::sleep(Duration::from_secs(10)).await; // imitation of some long-running task
-    // so far we are going to try 4 instances at once
-    let _ = run_artgrid_instance(state, &url).await;
-    // let a = run_artgrid_instance(state.clone(), url.clone()).await?;
-    // run_artgrid_instance(state.clone(), url.clone()).await?;
-    // run_artgrid_instance(state.clone(), url.clone()).await?;
+    let (tx, rt) = oneshot::channel();
+    let cmd = Command::Get { key: url.clone(),resp: tx };
+    if let Err(e) = state.send(cmd).await{
+        println!("{}", e);
+    };
 
+    let res = match rt.await{
+        Ok(res) => {
+                    println!("{}", res); Ok(res)
+        },
+        Err(e) => Err(e),
+    };
+
+    println!("result {:?}", res.err());
+    println!("we received this downloaded url {}", url);
     (StatusCode::OK, "Request was received")
 }
+
 

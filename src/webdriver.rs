@@ -63,18 +63,23 @@ impl Selenium {
     fn start_selenium_server(geckodriver_path: &str) -> Result<()> {
         // Chrome driver ends with application together, but if there is some handler err driver keeps running...
         Command::new("pkill")
-            .arg("chromedriver")
+            .arg("chromedri")
             .spawn()
-            .expect("failed")
-            .wait()
-            .expect("Failed to wait"); //adjusted to wait for process to exit
+            .expect("failed");
 
-        Command::new(geckodriver_path)
+
+        let res = Command::new(geckodriver_path)
             .arg("--port=4444")
-            .spawn()
-            .expect("gecko server (driver) process should be running")
-            .wait()
-            .expect("Failed to wait");
+            .spawn();
+
+        // need to give time for driver to start...
+        sleep(Duration::from_secs(5));
+
+        println!("Result is {:?}", res.err());
+            // .spawn()
+            // .expect("gecko server (driver) process should be running")
+            // .wait()
+            // .expect("Failed to wait");
 
         Ok(())
     }
