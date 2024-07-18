@@ -47,8 +47,6 @@ fn get_footage_id(user_url: &str) -> String {
 // TODO proper error
 // TODO allow download whole channel of author
 pub async fn run_artgrid_instance(driver: Client, user_url: &str) -> Result<String, fantoccini::error::CmdError> {
-
-
     driver.goto(ARTGRID_HOME_PAGE).await?;
     driver.maximize_window().await?;
     let login_element = driver.find(Locator::Css("art-user")).await;
@@ -136,7 +134,7 @@ pub async fn run_artgrid_instance(driver: Client, user_url: &str) -> Result<Stri
 
     let attr = match serde_json::to_value(footage.clone().attr("href").await?){
         Ok(value) => Ok(value),
-        Err(err) => { println!("failed serialize footage {:?}", err);Err(err)}
+        Err(err) => { println!("failed serialize href  {:?}", err);Err(err)}
     };
 
     let args = vec![
@@ -153,7 +151,7 @@ pub async fn run_artgrid_instance(driver: Client, user_url: &str) -> Result<Stri
 
     let js_code = r#"
         const hrefValue = arguments[1];
-        const done = arguments[arguments.length - 1];
+        let done = arguments[arguments.length - 1];
 
         // The target anchor selector might need adjustments
         const anchor = document.querySelector(`a[href*="${hrefValue}"]`);
@@ -180,10 +178,9 @@ pub async fn run_artgrid_instance(driver: Client, user_url: &str) -> Result<Stri
     println!("Result: {:?}", ret);
 
 
-
     // at the end extract user footage id for file identification on server side
     let id = get_footage_id(&user_url);
-
+    // TODO this should be spawned in on_block
     match file_downloaded(id){
         Ok(downloaded_file) => Ok(downloaded_file),
         Err(err) => Err(CmdError::Lost(err.into())),
