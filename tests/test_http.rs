@@ -10,6 +10,7 @@ use fantoccini::{ClientBuilder, Locator};
 use fantoccini::elements::Element;
 use fantoccini::error::{CmdError, ErrorStatus, WebDriver};
 use fantoccini::error::ErrorStatus::UnknownError;
+use fantoccini::wd::Capabilities;
 use log::error;
 use reqwest::Client;
 use reqwest::header;
@@ -101,13 +102,15 @@ async fn init_webdriver() -> fantoccini::Client {
     Command::new(path)
         .arg("--port=4444")
         .spawn()
-        .expect("chrome driver is running")
-        .wait();
+        .expect("chrome driver is running");
 
-    ClientBuilder::native()
-        .connect("http://localhost:4444")
-        .await
-        .expect("localhost init failed")
+    let cap: Capabilities = serde_json::from_str(
+        r#"{"browserName":"chrome","goog:chromeOptions":{"args":["--incognito"]}}"#,
+    ).unwrap();
+    //cap.insert("", "");
+    let mut client = ClientBuilder::native();
+
+   client.connect("http://localhost:4444").await.expect("localhost init failed")
 }
 
 async fn get_specific_footage_video(footage: Element) -> Result<Vec<Value>> {
@@ -160,7 +163,8 @@ async fn test_user_footage_download() -> Result<(), fantoccini::error::CmdError>
     // we should be inside user collection page
     client.find(Locator::XPath(ARTGRID_COLLECTION)).await?.click().await?;
 
-    let footage_lint = "https://artgrid.io/clip/766124/longboarder-skater-firetail-skateboard-sparks";
+    // TODO we can't choose footage which is not loaded on page
+    let footage_lint = "https://artgrid.io/clip/373014/water-lily-pink-flower-flowering-plant-bloom";
 
     let footage = client
         .find(Locator::XPath(get_href_value(footage_lint).as_str()))
@@ -187,7 +191,7 @@ async fn test_user_footage_download() -> Result<(), fantoccini::error::CmdError>
             done(false); // Notify Selenium that the operation failed - anchor not found
         }
     "#;
-   client.execute_async(js_code, args).await.unwrap();
+   let res = client.execute_async(js_code, args).await.unwrap();
     // if no error download started
     // don't wait for full download.
    client.close().await

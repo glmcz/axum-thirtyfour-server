@@ -7,13 +7,11 @@ use tokio::sync::{mpsc, mpsc::Sender};
 use tokio::{runtime, select, signal};
 use tokio::net::TcpListener;
 use log::LevelFilter;
-use axum::{
-  routing::post, Router,
-  extract::Request,
-};
+use axum::{routing::post, Router, extract::Request, Error};
 use dotenv::dotenv;
 use fantoccini::Client;
 use admin::logger::SimpleLogger;
+use crate::file_utils::file_helpers::file_downloaded;
 use crate::footager::artgrid::run_artgrid_instance;
 use crate::footager::user::Command;
 use crate::webdriver::Selenium;
@@ -52,16 +50,23 @@ fn main() -> Result<(), fantoccini::error::WebDriver> {
     // Update2 we can`t use oneShot because it doesn`t have Clone and it is designed for SPSC,
     // but we are adding it into handler for every req so we need MPMC...
     let (main_sender, mut main_receiver) = tokio::sync::mpsc::channel(100);
+    // Arc+ Mutex + clone need SEND trait for moving between threads. But Selenium doesn't have it...
+    // let shared_recv = Arc::new(Mutex::new(main_receiver));
 
     threaded_rt.block_on( async {
-        let axum_task = threaded_rt.spawn(async {
-            main_task(main_sender).await;
-        });
+        let axum_task = main_task(main_sender);
 
         let bg_task = threaded_rt.spawn(async {
             let driver = Selenium::init_selenium_driver("src/config.json").await.unwrap();
             // TODO handle missing conn to chromeDriver
-            second_task(main_receiver, driver.current_driver).await;
+
+            if let Some(e)  = second_task(main_receiver, driver.clone().current_driver).await.err() {
+                eprintln!("bg_thread failed with err {}", e);
+                // println!("Trying to recover: starting a new bg_thread");
+                // need to impl Send for future...
+                // or just use supervisor pattern and rewrite app
+                // let _ = second_task(shared_recv.clone(), driver.clone().current_driver).await;
+            }
         });
         tokio::join!(axum_task, bg_task);
     });
@@ -91,23 +96,35 @@ async fn main_task(main_sender: Sender<Command>) {
     }
 }
 
-async fn second_task(mut recv: mpsc::Receiver<Command>, driver: Client){
+async fn second_task(mut receiver: mpsc::Receiver<Command>, driver: Client) -> Result<(), Error> {
+    //let mut recv = receiver.lock().unwrap();
     loop {
         select! {
-            msg = recv.recv() => {
+            msg = receiver.recv() => {
                 if let Some(cmd) = msg {
                     match cmd {
                         Command::Get { key, resp} => {
-                            let res = match run_artgrid_instance(driver.clone(), key.as_str()).await{
-                                Ok(url) => Ok(url),
+                            let file_path = match run_artgrid_instance(driver.clone(), key.as_str()).await {
+                                // TODO upgrade file path String to std::path::Path
+                                Ok(file_path) => file_path,
                                 Err(e) => {
-                                    println!("{}", e);
-                                    Err(e)
+                                    println!("{}", e); return Err(Error::new(e))
                                 }
                             };
-
-                            if let Some(e) = resp.send(res.unwrap().to_string()).err(){
+                            let handle = tokio::spawn(async move {
+                                let res = match file_downloaded(file_path).await {
+                                    Ok(downloaded_file) => {
+                                        if let Some(e) = resp.send(downloaded_file).err() {
+                                            println!("{}", e);
+                                        }
+                                   },
+                                   Err(e) => return Err(e),
+                                };
+                                Ok(res)
+                            });
+                            if let Err(e) = handle.await {
                                 println!("{}", e);
+                                return Err(Error::new(e));
                             }
                         }
                     }

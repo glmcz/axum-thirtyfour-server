@@ -6,6 +6,7 @@ use std::time::Duration;
 use fantoccini::{Client, ClientBuilder};
 use eyre::Result;
 use fantoccini::error::ErrorStatus;
+use fantoccini::wd::Capabilities;
 use serde::Deserialize;
 
 #[derive(Clone)]
@@ -42,10 +43,15 @@ impl Selenium {
             return Err(fantoccini::error::WebDriver::new(ErrorStatus::UnknownError ,err.to_string()))
         }
 
-        match ClientBuilder::native().connect(config.get_full_address().as_str()).await {
-            Ok(driver) => Ok(Selenium {
-                current_driver: driver
-            }),
+        let cap: Capabilities = serde_json::from_str(
+            r#"{"browserName":"chrome","goog:chromeOptions":{"args":["--incognito"]}}"#,
+        ).unwrap();
+
+        let mut client = ClientBuilder::native();
+        match client.capabilities(cap).connect(config.get_full_address().as_str()).await {
+            Ok(driver) =>  Ok(Selenium {
+                    current_driver: driver
+                }),
             // in case of outdated version of chrome https://googlechromelabs.github.io/chrome-for-testing/#stable
             Err(e) => Err(fantoccini::error::WebDriver::new(ErrorStatus::UnknownError ,e.to_string()))
         }

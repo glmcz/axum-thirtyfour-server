@@ -1,9 +1,6 @@
-use file_helpers::file_downloaded;
 use fantoccini::{Client, Locator};
 use fantoccini::actions::{InputSource, MouseActions, PointerAction,};
-use fantoccini::error::CmdError;
 use tokio::time::Duration;
-use crate::file_utils::file_helpers;
 
 static ARTGRID_TEST_USER_INPUT: &str = "https://artgrid.io/clip/302105/boat-river-buildings-clouds";
 static ARTGRID_SUBMIT_XPATH: &str = "//mat-dialog-container[@id=\'LoginDialog\']/art-login/div/div/div[2]/div/form/div[2]/art-spinner-button/div/button";
@@ -44,8 +41,9 @@ fn get_footage_id(user_url: &str) -> String {
     }
 }
 
-// TODO proper error
+
 // TODO allow download whole channel of author
+// TODO every error throw down whole selenium script... is it really what we wont to? Maybe handle result instead of "?"
 pub async fn run_artgrid_instance(driver: Client, user_url: &str) -> Result<String, fantoccini::error::CmdError> {
     driver.goto(ARTGRID_HOME_PAGE).await?;
     driver.maximize_window().await?;
@@ -69,12 +67,6 @@ pub async fn run_artgrid_instance(driver: Client, user_url: &str) -> Result<Stri
         let submit = driver.find(Locator::XPath(ARTGRID_SUBMIT_XPATH)).await?;
         submit.click().await?;
 
-        // // Obsolate save all cookies into file so we wouldn't have to authenticate again
-        // let cookies = driver.get_all_cookies().await?;
-        // cookies_write_to_file(cookies, ChooseDomain::Artgrid);
-
-        // Wait until the submit button no longer exists
-        // submit.wait_until().condition(f)
         tokio::time::sleep(Duration::from_secs(4)).await;
     }
 
@@ -144,11 +136,7 @@ pub async fn run_artgrid_instance(driver: Client, user_url: &str) -> Result<Stri
     // arguments[0]: An HTML element that is expected to be updated with new HTML content.
     // arguments[1]: A string containing HTML content that will be set as the inner HTML of the element.
     // arguments[2]: A callback function (done) that will be invoked after the HTML update is complete.
-    //callback function return the element we want to
-
-    // adjusting timeout for really long downloading requests
-    // driver.set_script_timeout(std::time::Duration::from_secs(120)).await?;
-
+    // callback function return the element we want.
     let js_code = r#"
         const hrefValue = arguments[1];
         let done = arguments[arguments.length - 1];
@@ -169,24 +157,10 @@ pub async fn run_artgrid_instance(driver: Client, user_url: &str) -> Result<Stri
             done(false); // Notify Selenium that the operation failed - anchor not found
         }
     "#;
-    // sometimes it throws
-    // JS error Standard(WebDriver { error: JavascriptError, message: "javascript error: done is not a function\n
-    let ret = match driver.execute(js_code, args).await{
-        Ok(res) => Ok(res),
-        Err(err) => { println!("JS error {:?}", err);Err(err)}
-    };
-    println!("Result: {:?}", ret);
 
+    let res = driver.execute_async(js_code, args).await.unwrap();
+    println!("Result: {:?}", res);
 
     // at the end extract user footage id for file identification on server side
-    let id = get_footage_id(&user_url);
-    // TODO this should be spawned in on_block
-    match file_downloaded(id){
-        Ok(downloaded_file) => Ok(downloaded_file),
-        Err(err) => Err(CmdError::Lost(err.into())),
-    }
-
-    //TODO if file is in download folder twice (1), (2), we need to choose newest one and checking if
-    //TODO resume, error, the file`s size is growing or not. Size can`t be 0;
-    // TODO every error throw down whole selenium script... is it really what we wont to? Maybe handle result instead of "?"
+    Ok(get_footage_id(&user_url))
 }

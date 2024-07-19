@@ -12,4 +12,4 @@ POST http://localhost:3000/footager
 Authorization: Bearer your_token
 Content-Type: application/json
 
-{ "name": "test", "url": "https://artgrid.io/clip/6243583/snow-winter-chugach-alaska" }
+{ "name": "test", "url": "https://artgrid.io/clip/6240191/volcano-misty-eruption-golden-hour" }
