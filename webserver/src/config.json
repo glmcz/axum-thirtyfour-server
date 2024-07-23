@@ -1,0 +1,5 @@
+{
+  "geckodriver_path": "/Users/martindurak/Desktop/web_rust/thirtyfour_zk/webserver/src/chromedriver",
+  "driver_address": "localhost",
+  "port": 4444
+}

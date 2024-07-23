@@ -12,15 +12,17 @@ use dotenv::dotenv;
 use fantoccini::Client;
 use admin::logger::SimpleLogger;
 use crate::file_utils::file_helpers::file_downloaded;
-use crate::footager::artgrid::run_artgrid_instance;
-use crate::footager::user::Command;
-use crate::webdriver::Selenium;
+
+extern crate webscrapping;
+use webscrapping::{Selenium};
+use webscrapping::artgrid::run_artgrid_instance;
+use footager::user::Command;
 
 mod footager;
 mod admin;
 mod middleware;
 mod file_utils;
- mod webdriver;
+
 
 // TODO upgrade to https://github.com/hyperium/tonic
 fn router_setup(sender: Sender<Command>) -> Router<()> {
@@ -57,7 +59,7 @@ fn main() -> Result<(), fantoccini::error::WebDriver> {
         let axum_task = main_task(main_sender);
 
         let bg_task = threaded_rt.spawn(async {
-            let driver = Selenium::init_selenium_driver("src/config.json").await.unwrap();
+            let driver = Selenium::init_selenium_driver("webserver/src/config.json").await.unwrap();
             // TODO handle missing conn to chromeDriver
 
             if let Some(e)  = second_task(main_receiver, driver.clone().current_driver).await.err() {

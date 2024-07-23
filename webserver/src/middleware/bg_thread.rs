@@ -6,7 +6,6 @@ use lazy_static::lazy_static;
 use std::sync::Mutex;
 
 use super::cpu::{CPU, init_cpu_measurement};
-//use crate::footager::artgrid;
 use crate::Selenium;
 
 

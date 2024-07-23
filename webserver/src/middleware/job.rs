@@ -30,6 +30,8 @@ impl Task {
             finished: finished,
         }
     }
+
+    // impl set_finished
 }
 
 

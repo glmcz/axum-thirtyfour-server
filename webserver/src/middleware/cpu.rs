@@ -45,7 +45,6 @@ impl CPU {
         &mut self.sys.refresh_memory();
         if &self.sys.used_memory() >= &90 {
             log::warn!("Total mem is {} used is {}", &self.sys.total_memory(), &self.sys.used_memory());
-
         }
     }
     pub fn get_memory_usage(&mut self) {

@@ -1,13 +1,15 @@
+use std::process::Command;
 use std::fs::File;
 use std::io::BufReader;
-use std::process::Command;
 use std::thread::sleep;
 use std::time::Duration;
 use fantoccini::{Client, ClientBuilder};
-use eyre::Result;
 use fantoccini::error::ErrorStatus;
 use fantoccini::wd::Capabilities;
 use serde::Deserialize;
+pub mod artgrid;
+pub mod utils;
+
 
 #[derive(Clone)]
 pub struct Selenium {
@@ -50,8 +52,8 @@ impl Selenium {
         let mut client = ClientBuilder::native();
         match client.capabilities(cap).connect(config.get_full_address().as_str()).await {
             Ok(driver) =>  Ok(Selenium {
-                    current_driver: driver
-                }),
+                current_driver: driver
+            }),
             // in case of outdated version of chrome https://googlechromelabs.github.io/chrome-for-testing/#stable
             Err(e) => Err(fantoccini::error::WebDriver::new(ErrorStatus::UnknownError ,e.to_string()))
         }
@@ -66,7 +68,7 @@ impl Selenium {
         }
     }
 
-    fn start_selenium_server(geckodriver_path: &str) -> Result<()> {
+    pub fn start_selenium_server(geckodriver_path: &str) -> Result<(), fantoccini::error::WebDriver> {
         // Chrome driver ends with application together, but if there is some handler err driver keeps running...
         Command::new("pkill")
             .arg("chromedri")
@@ -82,11 +84,12 @@ impl Selenium {
         sleep(Duration::from_secs(5));
 
         println!("Result is {:?}", res.err());
-            // .spawn()
-            // .expect("gecko server (driver) process should be running")
-            // .wait()
-            // .expect("Failed to wait");
+        // .spawn()
+        // .expect("gecko server (driver) process should be running")
+        // .wait()
+        // .expect("Failed to wait");
 
         Ok(())
     }
 }
+

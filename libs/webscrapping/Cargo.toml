@@ -1,0 +1,17 @@
+[package]
+name = "webscrapping"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+doctest = false
+
+[dependencies]
+fantoccini = { version = "0.20.0-rc.7" }
+tokio = { version = "1.27.0", features = ["time", "test-util", "rt-multi-thread", "macros"] }
+serde = { version = "1.0.201", features = ["derive"] }
+serde_json = { version = "1.0.117" }
+
+[dev-dependencies]
+dotenv = { version = "0.15.0"}
+
