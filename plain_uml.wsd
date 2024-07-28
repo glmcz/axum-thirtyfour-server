@@ -1,15 +1,12 @@
 @startuml
 participant client
 
-client -> main_thread : new req arrived
-main_thread -> footage_handler : we want to proceed it
-main_thread -> main_thread : add req to Queue if script already running
+client -> runtime : new req arrived
+runtime -> middleware : check req and limit them. TODO How do we find out that channel capacity is full?
+middleware -> footage_handler : we want to proceed a req
 
-footage_handler -> bg_thread : check if bg_thread exists
-footage_handler -> footage_handler : if not create a new thread
-bg_thread -> scripts : if script not running already
-bg_thread -> bg_thread : wait for completed download
-bg_thread -> main_thread : script is done so while waiting check req queue and invoke script
-bg_thread -> main_thread : give a link for downloaded file to client
-main_thread -> client : send response
+footage_handler -> runtime : spawn for downloading with selenium instance (max 2 for artgrid and artlist)
+footage_handler -> runtime : file was downloaded. Run a new task that notify that file is downloaded
+footage_handler -> runtime : if file is downloaded server it to user
+
 @enduml

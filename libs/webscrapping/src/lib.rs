@@ -8,12 +8,15 @@ use fantoccini::error::ErrorStatus;
 use fantoccini::wd::Capabilities;
 use serde::Deserialize;
 pub mod artgrid;
+pub mod artlist;
 pub mod utils;
+pub mod domain;
+
 
 
 #[derive(Clone)]
 pub struct Selenium {
-    pub current_driver: Client,
+    pub current_driver: Option<Client>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -38,28 +41,41 @@ impl ConfigFile{
     }
 }
 
-impl Selenium {
-    pub async fn init_selenium_driver(config_path: &str) -> Result<Selenium, fantoccini::error::WebDriver> {
-        let config =  Self::load_webriver_config_file(config_path).unwrap_or(ConfigFile::default());
-        if let Err(err) = Self::start_selenium_server(config.geckodriver_path.as_str()){
-            return Err(fantoccini::error::WebDriver::new(ErrorStatus::UnknownError ,err.to_string()))
-        }
 
+pub trait SeleniumOperations: Send + Sync + 'static{
+    async fn init_connection(&mut self, config_file: ConfigFile) -> Result<(), fantoccini::error::WebDriver>;
+    fn get_driver(&self) -> Option<&Client>;
+}
+
+
+impl SeleniumOperations for Selenium {
+    async fn init_connection(&mut self, config: ConfigFile) -> Result<(), fantoccini::error::WebDriver> {
+        // a new_tab doesn't work, because of Chromedriver bug in incognito mode
+        // r#"{"browserName":"chrome","goog:chromeOptions":{"args":["--incognito"]}}"#,
         let cap: Capabilities = serde_json::from_str(
-            r#"{"browserName":"chrome","goog:chromeOptions":{"args":["--incognito"]}}"#,
+            r#"{"browserName":"chrome"}"#,
         ).unwrap();
 
         let mut client = ClientBuilder::native();
         match client.capabilities(cap).connect(config.get_full_address().as_str()).await {
-            Ok(driver) =>  Ok(Selenium {
-                current_driver: driver
-            }),
+            Ok(driver) =>  Ok( self.current_driver = Some(driver)
+            ),
             // in case of outdated version of chrome https://googlechromelabs.github.io/chrome-for-testing/#stable
             Err(e) => Err(fantoccini::error::WebDriver::new(ErrorStatus::UnknownError ,e.to_string()))
         }
     }
+    fn get_driver(&self) -> Option<&Client> {
+       self.current_driver.as_ref()
+    }
+}
 
-    pub fn load_webriver_config_file(path: &str) -> Result<ConfigFile, fantoccini::error::WebDriver>{
+impl Selenium {
+    pub fn new() -> Self {
+        Selenium{
+            current_driver: None
+        }
+    }
+    pub fn load_webriver_config_file(&self, path: &str) -> Result<ConfigFile, fantoccini::error::WebDriver>{
         let f = File::open(path).expect("Incorrect file path");
         let reader = BufReader::new(f);
         match serde_json::from_reader(reader) {
@@ -75,6 +91,7 @@ impl Selenium {
             .spawn()
             .expect("failed");
 
+        sleep(Duration::from_secs(1));
 
         let res = Command::new(geckodriver_path)
             .arg("--port=4444")

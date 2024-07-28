@@ -7,8 +7,6 @@ use tokio::time::Duration;
 
 use crate::utils::{get_href_value, get_footage_id};
 
-
-
 static ARTGRID_TEST_USER_INPUT: &str = "https://artgrid.io/clip/302105/boat-river-buildings-clouds";
 static ARTGRID_SUBMIT_XPATH: &str = "//mat-dialog-container[@id=\'LoginDialog\']/art-login/div/div/div[2]/div/form/div[2]/art-spinner-button/div/button";
 ///html/body/div[5]/div[2]/div/mat-dialog-container                     /art-login/div/div/div[2]/div/form/div[2]/art-spinner-button/div/button
@@ -89,7 +87,7 @@ pub async fn click_on_hidden_download_button(client: &Client, args: Vec<serde_js
 
 // TODO allow download whole channel of author
 // TODO every error throw down whole selenium script... is it really what we wont to? Maybe handle result instead of "?"
-pub async fn run_artgrid_instance(client: Client, user_url: &str) -> Result<String, error::CmdError> {
+pub async fn run_artgrid_instance(client: &Client, user_url: &str) -> Result<String, error::CmdError> {
     client.goto(ARTGRID_HOME_PAGE).await?;
     client.maximize_window().await?;
     let login_element = client.find(Locator::Css("art-user")).await;

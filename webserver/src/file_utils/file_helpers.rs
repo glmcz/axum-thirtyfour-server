@@ -1,14 +1,13 @@
 use std::{fs, io::Error, io::ErrorKind};
 use std::time::{Duration, Instant};
 use std::path::{Path, PathBuf};
+use std::thread::sleep;
 
 /// main function for file
 /// should return downloaded file path if exists otherwise return, io::Error
 // TODO refactor PathBuf from String for these functions
-pub async fn file_downloaded(file_name: String) -> Result<String, Error> {
-    let dir_path = PathBuf::from("/Users/martindurak/Downloads");
-
-    match pool_download_dir(&dir_path, file_name).await {
+pub fn file_downloaded(file_name: String, dest_dir: PathBuf) -> Result<String, Error> {
+    match pool_download_dir(&dest_dir, file_name) {
         Ok(file_path) => {
             println!("File downloaded successfully: {:?}", file_path);
             Ok(file_path.to_string_lossy().to_string())
@@ -20,7 +19,7 @@ pub async fn file_downloaded(file_name: String) -> Result<String, Error> {
     }
 }
 
-async fn pool_download_dir(dir: &Path, link_file_name: String) -> Result<PathBuf, Error> {
+fn pool_download_dir(dir: &Path, link_file_name: String) -> Result<PathBuf, Error> {
    let start_time = Instant::now();
    let mut file_path: Option<PathBuf> = None;
    let mut last_size = 0;
@@ -57,7 +56,7 @@ async fn pool_download_dir(dir: &Path, link_file_name: String) -> Result<PathBuf
             }
             last_size = metadata.len();
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100))
    }
     // File with the specified name not found
     Err(Error::new(ErrorKind::NotFound, "File not found"))

@@ -6,7 +6,7 @@ use dotenv::dotenv;
 use fantoccini::Locator;
 
 extern crate webscrapping;
-use webscrapping::{utils, artgrid, Selenium};
+use webscrapping::{utils, artgrid, Selenium, SeleniumOperations};
 
 static ARTGRID_SUBMIT_XPATH: &str = "//mat-dialog-container[@id=\'LoginDialog\']/art-login/div/div/div[2]/div/form/div[2]/art-spinner-button/div/button";
 static ARTGRID_SING_IN: &str = "https://artgrid.io/signin";
@@ -20,8 +20,11 @@ static ARTGRID_COLLECTION: &str = "//button[@class='art-user']";
 #[tokio::test]
 async fn test_user_footage_download() -> Result<(), fantoccini::error::CmdError> {
     let zk = dotenv().ok();
+    let mut selenium = Selenium::new();
+    let config_file = selenium.load_webriver_config_file("./../../webserver/src/config.json").unwrap();
+    let _ = Selenium::start_selenium_server(config_file.geckodriver_path.as_str());
 
-    let client = Selenium::init_selenium_driver("./../../webserver/src/config.json").await.unwrap().current_driver;
+    let client = selenium.init_connection(config_file).await.unwrap();
     let _ = client.goto(ARTGRID_SING_IN).await.unwrap();
 
     if let Err(e) = artgrid::artgrid_log_in(&client).await{

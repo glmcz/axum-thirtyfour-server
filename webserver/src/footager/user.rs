@@ -1,22 +1,19 @@
-use std::rc::Rc;
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use axum::http::StatusCode;
 use axum::{extract::Json, response::IntoResponse};
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot;
-use tokio::sync::mpsc::Receiver;
-
+use webscrapping::SeleniumOperations;
+use tokio::task;
+use crate::file_utils::file_helpers::file_downloaded;
+use crate::footager::site_dispatch::run_site_instance;
 
 #[derive(Debug, Deserialize)]
 pub struct FootageUserRequest {
     name: String,
-    url: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct FootageUser {
-    recv: Rc<Receiver<String>>,
+    pub url: String,
 }
 
 #[derive(Serialize)]
@@ -26,43 +23,41 @@ pub enum FootageUserResponse {
     BadRequest,
 }
 
-#[derive(Debug)]
-pub enum Command {
-    Get {
-        key: String,
-        resp: Responder<String>,
-    },
-    // Set {
-    //     id: u8,
-    //     val: String,
-    //     resp: Responder<String>,
-    // },
+
+#[derive(Clone)]
+pub struct AppState<T: SeleniumOperations> {
+    pub selenium: Arc<T>,
 }
 
-type Responder<T> = oneshot::Sender<T>;
 
-#[axum::debug_handler]
-pub async fn footage_user_handler(State(state): State<Sender<Command>>, Json(params): Json<FootageUserRequest>) -> impl IntoResponse {
-    let name = params.name;
-    let url = &params.url;
-    println!("name {} url {}" , name, url.clone());
+pub async fn footage_user_handler<T: SeleniumOperations>(State(state): State<AppState<T>>, Json(params): Json<FootageUserRequest>) -> impl IntoResponse {
 
-    let (tx, rt) = oneshot::channel();
-    let cmd = Command::Get { key: url.clone(),resp: tx };
-    if let Err(e) = state.send(cmd).await{
-        println!("{}", e);
-    };
+    let res = task::spawn(async move {
+        run_site_instance(state.selenium.get_driver(), params).await
+    });
 
-    let res = match rt.await{
-        Ok(res) => {
-                    println!("{}", res); Ok(res)
-        },
-        Err(e) => Err(e),
-    };
+    match res.await {
+        Ok(Ok(file_path)) => {
+            let final_video_path = match task::spawn_blocking(move || {
+                if !file_path.is_empty() {
+                    file_downloaded(file_path, PathBuf::from("/Users/martindurak/Downloads"))
+                } else {
+                    Ok("sss".to_owned())
+                }
+            })
+                .await
+            {
+                Ok(Ok(path)) => path,
+                Ok(Err(e)) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+                Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+            };
 
-    println!("result {:?}", res.err());
-    println!("we received this downloaded url {}", url);
-    (StatusCode::OK, "Request was received")
+            println!("{:?} download path", final_video_path);
+            (StatusCode::OK, "Request was received").into_response()
+        }
+        Ok(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
 }
 
 
